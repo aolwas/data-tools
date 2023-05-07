@@ -1,2 +1,2 @@
-# data-api-poc
-Rust/Arrow/S3 based API Proof of Concept
+# data-tools
+Toy project around Rust/Arrow/Datafusion/DeltaRS/Axum/Tui
