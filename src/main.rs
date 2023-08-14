@@ -14,11 +14,13 @@ async fn main() {
     let shared_state = Arc::new(AppState::new());
 
     let args = Args::parse();
-
+    let req_time = Instant::now();
     shared_state
         .register_table(&args)
         .await
         .expect("Table registration fails");
+    let req_time_elapsed = req_time.elapsed();
+    println!("Table registration time: {:.2?}", req_time_elapsed);
 
     let req_time = Instant::now();
     shared_state
@@ -29,5 +31,5 @@ async fn main() {
         .await
         .expect("Query show fails");
     let req_time_elapsed = req_time.elapsed();
-    println!("Elapsed: {:.2?}", req_time_elapsed);
+    println!("Query execution time: {:.2?}", req_time_elapsed);
 }
