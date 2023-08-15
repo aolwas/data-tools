@@ -8,7 +8,7 @@ use datafusion::datasource::listing::{
 use datafusion::datasource::TableProvider;
 use datafusion::error::DataFusionError;
 use datafusion::prelude::*;
-use deltalake::{DeltaTable, DeltaTableError};
+use deltalake::{DeltaTable, DeltaTableBuilder, DeltaTableError};
 use object_store::aws::AmazonS3Builder;
 use std::sync::Arc;
 use url::{ParseError, Url};
@@ -112,7 +112,10 @@ impl AppState {
     }
 
     async fn delta_table_provider(&self, config: &Config) -> Result<DeltaTable, DeltaTableError> {
-        deltalake::open_table(config.path.as_str()).await
+        DeltaTableBuilder::from_uri(config.path.as_str())
+            .without_tombstones()
+            .load()
+            .await
     }
 }
 
