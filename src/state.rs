@@ -1,6 +1,5 @@
 use datafusion::arrow::datatypes::DataType;
 use datafusion::common::Result;
-use datafusion::datasource::file_format::file_type::{FileType, GetExt};
 use datafusion::datasource::file_format::parquet::ParquetFormat;
 use datafusion::datasource::listing::{
     ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl,
@@ -94,8 +93,8 @@ impl AppState {
             .with_enable_pruning(Some(true))
             .with_skip_metadata(Some(true));
 
-        let listing_common_options = ListingOptions::new(Arc::new(file_format))
-            .with_file_extension(FileType::PARQUET.get_ext());
+        let listing_common_options =
+            ListingOptions::new(Arc::new(file_format)).with_file_extension(".parquet");
 
         let listing_options = match config.partition_spec.clone() {
             Some(parts) => listing_common_options.with_table_partition_cols(parts),

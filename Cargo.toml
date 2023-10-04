@@ -8,11 +8,9 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.2.5", features = ["derive"] }
 anyhow = { version = "1.0" }
-aws-config = "0.55.1"
-aws-types = "0.55.1"
-deltalake = { version = "0.14", features = ["datafusion", "s3"]}
-datafusion = { version = "28" }
-object_store = { version = "0.6.1", features=["aws"] }
+deltalake = { version = "0.16", features = ["datafusion", "s3"]}
+datafusion = { version = "31" }
+object_store = { version = "0.7.0", features=["aws"] }
 chrono = "0.4.24"
 axum = "0.6.18"
 hyper = { version = "0.14.26", features = ["full"] }
