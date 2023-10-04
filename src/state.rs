@@ -6,6 +6,7 @@ use datafusion::datasource::listing::{
 };
 use datafusion::datasource::TableProvider;
 use datafusion::error::DataFusionError;
+use datafusion::execution::context::SessionConfig;
 use datafusion::prelude::*;
 use deltalake::{DeltaTable, DeltaTableBuilder, DeltaTableError};
 use object_store::aws::AmazonS3Builder;
@@ -35,7 +36,9 @@ pub struct AppState {
 impl AppState {
     pub fn new() -> Self {
         Self {
-            ctx: SessionContext::new(),
+            ctx: SessionContext::with_config(
+                SessionConfig::default().with_information_schema(true),
+            ),
         }
     }
 
@@ -83,7 +86,11 @@ impl AppState {
     }
 
     pub async fn exec_query(&self, args: &Args) -> Result<DataFrame> {
-        let full_query = format!("{} LIMIT {}", args.query, args.limit);
+        let full_query = if args.query.starts_with("SELECT") || args.query.starts_with("select") {
+            format!("{} LIMIT {}", args.query, args.limit)
+        } else {
+            args.query.clone()
+        };
         println!("full query: {}", full_query);
         self.ctx.sql(full_query.as_str()).await
     }
