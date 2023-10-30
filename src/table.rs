@@ -15,14 +15,14 @@ use url::{ParseError, Url};
 
 use crate::cli::Format;
 
-pub struct App {
+pub struct TableContext {
     ctx: SessionContext,
     path: Url,
     partition_spec: Option<Vec<(String, DataType)>>,
     fmt: Format,
 }
 
-impl App {
+impl TableContext {
     pub fn new(table_path: &str, partitions: &Option<String>, fmt: Format) -> Self {
         Self {
             ctx: SessionContext::with_config(

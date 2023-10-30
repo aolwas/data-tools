@@ -3,13 +3,13 @@ use clap::Parser;
 use std::sync::Arc;
 use std::time::Instant;
 
-mod app;
 mod cli;
+mod table;
 mod tui;
 mod utils;
 
-use crate::app::App;
 use crate::cli::{Cli, Commands};
+use crate::table::TableContext;
 
 #[tokio::main]
 async fn main() {
@@ -24,16 +24,20 @@ async fn main() {
             limit,
             no_tui,
         } => {
-            let shared_state = Arc::new(App::new(table_path.as_str(), partitions, format.clone()));
+            let tblctx = Arc::new(TableContext::new(
+                table_path.as_str(),
+                partitions,
+                format.clone(),
+            ));
             let req_time = Instant::now();
-            shared_state
+            tblctx
                 .register_table()
                 .await
                 .expect("Table registration fails");
             let req_time_elapsed = req_time.elapsed();
             println!("Table registration time: {:.2?}", req_time_elapsed);
             let req_time = Instant::now();
-            let records = shared_state
+            let records = tblctx
                 .exec_query(query.clone(), limit.clone())
                 .await
                 .expect("Query execution fails")
@@ -62,16 +66,20 @@ async fn main() {
             format,
             no_tui,
         } => {
-            let shared_state = Arc::new(App::new(table_path.as_str(), partitions, format.clone()));
+            let tblctx = Arc::new(TableContext::new(
+                table_path.as_str(),
+                partitions,
+                format.clone(),
+            ));
             let req_time = Instant::now();
-            shared_state
+            tblctx
                 .register_table()
                 .await
                 .expect("Table registration fails");
             let req_time_elapsed = req_time.elapsed();
             println!("Table registration time: {:.2?}", req_time_elapsed);
             let req_time = Instant::now();
-            let records = shared_state
+            let records = tblctx
                 .schema()
                 .await
                 .expect("Schema query fails")
