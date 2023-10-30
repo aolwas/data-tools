@@ -19,6 +19,10 @@ deltalake = { version = "0.16", features = ["datafusion", "s3"]}
 datafusion = { version = "31" }
 object_store = { version = "0.7", features=["aws"] }
 
+# tui
+crossterm = { version = "0.27.0" }
+ratatui = { version = "0.23.0" }
+
 # runtime
 tokio = { version = "1", features = ["full"] }
 futures = { version = "0.3" }

@@ -29,6 +29,8 @@ pub enum Commands {
         limit: usize,
         #[arg(short, long)]
         partitions: Option<String>,
+        #[arg(long, default_value_t = false)]
+        no_tui: bool,
     },
     Schema {
         table_path: String,
@@ -36,5 +38,7 @@ pub enum Commands {
         format: Format,
         #[arg(short, long)]
         partitions: Option<String>,
+        #[arg(long, default_value_t = false)]
+        no_tui: bool,
     },
 }

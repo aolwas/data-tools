@@ -5,6 +5,7 @@ use std::time::Instant;
 
 mod app;
 mod cli;
+mod tui;
 mod utils;
 
 use crate::app::App;
@@ -21,6 +22,7 @@ async fn main() {
             query,
             partitions,
             limit,
+            no_tui,
         } => {
             let shared_state = Arc::new(App::new(table_path.as_str(), partitions, format.clone()));
             let req_time = Instant::now();
@@ -38,17 +40,27 @@ async fn main() {
                 .collect()
                 .await
                 .expect("Records collect fails");
-            println!(
-                "{}",
-                pretty_format_batches(&records).expect("Pretty format fails")
-            );
             let req_time_elapsed = req_time.elapsed();
             println!("Query execution time: {:.2?}", req_time_elapsed);
+            if *no_tui {
+                println!(
+                    "{}",
+                    pretty_format_batches(&records).expect("Pretty format fails")
+                );
+            } else {
+                let _ = tui::show_in_tui(
+                    pretty_format_batches(&records)
+                        .unwrap()
+                        .to_string()
+                        .as_str(),
+                );
+            }
         }
         Commands::Schema {
             table_path,
             partitions,
             format,
+            no_tui,
         } => {
             let shared_state = Arc::new(App::new(table_path.as_str(), partitions, format.clone()));
             let req_time = Instant::now();
@@ -66,12 +78,21 @@ async fn main() {
                 .collect()
                 .await
                 .expect("Schema collect fails");
-            println!(
-                "{}",
-                pretty_format_batches(&records).expect("Pretty format fails")
-            );
             let req_time_elapsed = req_time.elapsed();
             println!("Query execution time: {:.2?}", req_time_elapsed);
+            if *no_tui {
+                println!(
+                    "{}",
+                    pretty_format_batches(&records).expect("Pretty format fails")
+                );
+            } else {
+                let _ = tui::show_in_tui(
+                    pretty_format_batches(&records)
+                        .unwrap()
+                        .to_string()
+                        .as_str(),
+                );
+            }
         }
     }
 }
