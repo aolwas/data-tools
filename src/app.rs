@@ -13,37 +13,30 @@ use object_store::aws::AmazonS3Builder;
 use std::sync::Arc;
 use url::{ParseError, Url};
 
-use crate::args::{Args, Format};
+use crate::cli::Format;
 
-struct Config {
+pub struct App {
+    ctx: SessionContext,
     path: Url,
     partition_spec: Option<Vec<(String, DataType)>>,
+    fmt: Format,
 }
 
-impl Config {
-    fn from_args(args: &Args) -> Result<Config, ()> {
-        ensure_scheme(&args.table_path).map(|url| Config {
-            path: url,
-            partition_spec: get_partitions_spec(args),
-        })
-    }
-}
-
-pub struct AppState {
-    ctx: SessionContext,
-}
-
-impl AppState {
-    pub fn new() -> Self {
+impl App {
+    pub fn new(table_path: &str, partitions: &Option<String>, fmt: Format) -> Self {
         Self {
             ctx: SessionContext::with_config(
                 SessionConfig::default().with_information_schema(true),
             ),
+            path: ensure_scheme(table_path).unwrap(),
+            partition_spec: get_partitions_spec(partitions),
+            fmt: fmt,
         }
     }
 
-    fn register_store(&self, url: &Url) -> Result<()> {
-        match url.scheme() {
+    fn register_store(&self) -> Result<()> {
+        let url = &(self.path);
+        match self.path.scheme() {
             "s3" | "s3a" => {
                 let s3 = AmazonS3Builder::from_env()
                     .with_bucket_name(
@@ -68,34 +61,36 @@ impl AppState {
 
     pub async fn register_table(
         &self,
-        args: &Args,
     ) -> Result<Option<Arc<(dyn TableProvider)>>, DataFusionError> {
-        let config = Config::from_args(args).unwrap();
-        let provider: Arc<dyn TableProvider> = match args.format {
+        let provider: Arc<dyn TableProvider> = match self.fmt {
             Format::Parquet => {
-                self.register_store(&config.path)?;
-                let parquet_table = self.parquet_table_provider(&config).await?;
+                self.register_store()?;
+                let parquet_table = self.parquet_table_provider().await?;
                 Arc::new(parquet_table)
             }
             Format::Delta => {
-                let delta_table = self.delta_table_provider(&config).await?;
+                let delta_table = self.delta_table_provider().await?;
                 Arc::new(delta_table)
             }
         };
         self.ctx.register_table("tbl", provider)
     }
 
-    pub async fn exec_query(&self, args: &Args) -> Result<DataFrame> {
-        let full_query = if args.query.starts_with("SELECT") || args.query.starts_with("select") {
-            format!("{} LIMIT {}", args.query, args.limit)
+    pub async fn schema(&self) -> Result<DataFrame> {
+        self.ctx.sql("show columns from tbl").await
+    }
+
+    pub async fn exec_query(&self, query: String, limit: usize) -> Result<DataFrame> {
+        let full_query = if query.starts_with("SELECT") || query.starts_with("select") {
+            format!("{} LIMIT {}", query, limit)
         } else {
-            args.query.clone()
+            query.clone()
         };
         println!("full query: {}", full_query);
         self.ctx.sql(full_query.as_str()).await
     }
 
-    async fn parquet_table_provider(&self, config: &Config) -> Result<ListingTable> {
+    async fn parquet_table_provider(&self) -> Result<ListingTable> {
         let file_format = ParquetFormat::default()
             .with_enable_pruning(Some(true))
             .with_skip_metadata(Some(true));
@@ -103,12 +98,12 @@ impl AppState {
         let listing_common_options =
             ListingOptions::new(Arc::new(file_format)).with_file_extension(".parquet");
 
-        let listing_options = match config.partition_spec.clone() {
+        let listing_options = match self.partition_spec.clone() {
             Some(parts) => listing_common_options.with_table_partition_cols(parts),
             None => listing_common_options,
         };
 
-        let path = ListingTableUrl::parse(config.path.as_str())?;
+        let path = ListingTableUrl::parse(self.path.as_str())?;
         let table_config = ListingTableConfig::new(path)
             .with_listing_options(listing_options)
             .infer_schema(&self.ctx.state())
@@ -117,16 +112,16 @@ impl AppState {
         Ok(table)
     }
 
-    async fn delta_table_provider(&self, config: &Config) -> Result<DeltaTable, DeltaTableError> {
-        DeltaTableBuilder::from_uri(config.path.as_str())
+    async fn delta_table_provider(&self) -> Result<DeltaTable, DeltaTableError> {
+        DeltaTableBuilder::from_uri(self.path.as_str())
             .without_tombstones()
             .load()
             .await
     }
 }
 
-fn get_partitions_spec(args: &Args) -> Option<Vec<(String, DataType)>> {
-    if let Some(parts) = args.partitions.as_deref() {
+fn get_partitions_spec(partitions: &Option<String>) -> Option<Vec<(String, DataType)>> {
+    if let Some(parts) = partitions.as_deref() {
         let mut vec = Vec::new();
         parts
             .split(',')
