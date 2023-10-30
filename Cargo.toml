@@ -7,15 +7,23 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.2.5", features = ["derive"] }
-anyhow = { version = "1.0" }
+anyhow = { version = "1" }
+thiserror = { version = "1" }
+chrono = { version = "0.4" }
+url = { version = "2.3" }
+log = { version = "0.4" }
+
+# sql dependencies
+arrow = { version = "46.0.0", features = ["prettyprint"] }
 deltalake = { version = "0.16", features = ["datafusion", "s3"]}
 datafusion = { version = "31" }
-object_store = { version = "0.7.0", features=["aws"] }
-chrono = "0.4.24"
-axum = "0.6.18"
-hyper = { version = "0.14.26", features = ["full"] }
-tower = "0.4.13"
+object_store = { version = "0.7", features=["aws"] }
+
+# runtime
 tokio = { version = "1", features = ["full"] }
-url = { version = "2.3" }
-futures = "0.3"
-log = "0.4.19"
+futures = { version = "0.3" }
+
+# For future dev
+# axum = { version = "0.6" }
+# hyper = { version = "0.14", features = ["full"] }
+# tower = { version = "0.4" }
