@@ -16,10 +16,8 @@ pub enum LogLevel {
 
 /// cli parser
 #[derive(Parser)]
-#[command(name = "datatools")]
-#[command(author = "Maxime 'aolwas' Cottret <maxime.cottret@gmail.com>")]
-#[command(version = "0.1")]
-#[command(about = "Small toy project for data processing while learning Rust", long_about = None)]
+#[command(name = "adt")]
+#[command(author, version, about, long_about = None)]
 pub struct Cli {
     #[arg(short, long, value_enum, default_value_t = LogLevel::Info)]
     log_level: LogLevel,
@@ -29,6 +27,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
+    /// view (and export) parquet or delta tables
     View {
         table_path: String,
         #[arg(short, long, value_enum, default_value_t = Format::Delta)]
@@ -44,6 +43,7 @@ pub enum Commands {
         #[arg(short, long)]
         output_path: Option<String>,
     },
+    /// print parquet or delta table schema
     Schema {
         table_path: String,
         #[arg(short, long, value_enum, default_value_t = Format::Delta)]
