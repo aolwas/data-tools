@@ -41,6 +41,8 @@ pub enum Commands {
         partitions: Option<String>,
         #[arg(long, default_value_t = false)]
         no_tui: bool,
+        #[arg(short, long)]
+        output_path: Option<String>,
     },
     Schema {
         table_path: String,

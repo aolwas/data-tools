@@ -3,7 +3,8 @@ use std::time::Instant;
 
 use arrow::util::pretty::pretty_format_batches;
 use clap::Parser;
-use log::info;
+use datafusion::dataframe::DataFrameWriteOptions;
+use log::{error, info};
 use simple_logger::SimpleLogger;
 
 mod cli;
@@ -33,6 +34,7 @@ async fn main() {
             partitions,
             limit,
             no_tui,
+            output_path,
         } => {
             let tblctx = Arc::new(TableContext::new(
                 table_path.as_str(),
@@ -47,13 +49,15 @@ async fn main() {
             let req_time_elapsed = req_time.elapsed();
             info!("Table registration time: {:.2?}", req_time_elapsed);
             let req_time = Instant::now();
-            let records = tblctx
+            let df = tblctx
                 .exec_query(query.clone(), limit.clone())
                 .await
-                .expect("Query execution fails")
+                .expect("Query execution fails");
+            let records = df
+                .clone()
                 .collect()
                 .await
-                .expect("Records collect fails");
+                .expect("Unable to collect dataframe records");
             let req_time_elapsed = req_time.elapsed();
             info!("Query execution time: {:.2?}", req_time_elapsed);
             if *no_tui {
@@ -68,6 +72,38 @@ async fn main() {
                         .to_string()
                         .as_str(),
                 );
+            }
+            if let Some(op) = output_path {
+                let ext = std::path::Path::new(op)
+                    .extension()
+                    .expect("Unable to extract file extension")
+                    .to_str();
+                match ext {
+                    Some("csv") => {
+                        info!("export to csv");
+                        let _ = df
+                            .write_csv(
+                                op,
+                                DataFrameWriteOptions::default().with_single_file_output(true),
+                                None,
+                            )
+                            .await
+                            .unwrap();
+                        {}
+                    }
+                    Some("json") => {
+                        info!("export to newline delimited json");
+                        let _ = df
+                            .write_json(
+                                op,
+                                DataFrameWriteOptions::default().with_single_file_output(true),
+                            )
+                            .await
+                            .unwrap();
+                        {}
+                    }
+                    _ => error!("Unsupported output format"),
+                }
             }
         }
         Commands::Schema {
