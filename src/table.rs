@@ -9,6 +9,7 @@ use datafusion::error::DataFusionError;
 use datafusion::execution::context::SessionConfig;
 use datafusion::prelude::*;
 use deltalake::{DeltaTable, DeltaTableBuilder, DeltaTableError};
+use log::{debug, info};
 use object_store::aws::AmazonS3Builder;
 use std::sync::Arc;
 use url::{ParseError, Url};
@@ -35,6 +36,7 @@ impl TableContext {
     }
 
     fn register_store(&self) -> Result<()> {
+        debug!("register store");
         let url = &(self.path);
         match self.path.scheme() {
             "s3" | "s3a" => {
@@ -62,6 +64,7 @@ impl TableContext {
     pub async fn register_table(
         &self,
     ) -> Result<Option<Arc<(dyn TableProvider)>>, DataFusionError> {
+        debug!("register table");
         let provider: Arc<dyn TableProvider> = match self.fmt {
             Format::Parquet => {
                 self.register_store()?;
@@ -77,7 +80,9 @@ impl TableContext {
     }
 
     pub async fn schema(&self) -> Result<DataFrame> {
-        self.ctx.sql("show columns from tbl").await
+        let schema_query = "show columns from tbl";
+        info!("schema query: {}", schema_query);
+        self.ctx.sql(schema_query).await
     }
 
     pub async fn exec_query(&self, query: String, limit: usize) -> Result<DataFrame> {
@@ -86,11 +91,12 @@ impl TableContext {
         } else {
             query.clone()
         };
-        println!("full query: {}", full_query);
+        info!("full query: {}", full_query);
         self.ctx.sql(full_query.as_str()).await
     }
 
     async fn parquet_table_provider(&self) -> Result<ListingTable> {
+        debug!("get parquet table provider");
         let file_format = ParquetFormat::default()
             .with_enable_pruning(Some(true))
             .with_skip_metadata(Some(true));
@@ -113,6 +119,7 @@ impl TableContext {
     }
 
     async fn delta_table_provider(&self) -> Result<DeltaTable, DeltaTableError> {
+        debug!("get delta table provider");
         DeltaTableBuilder::from_uri(self.path.as_str())
             .without_tombstones()
             .load()

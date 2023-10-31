@@ -12,6 +12,7 @@ thiserror = { version = "1" }
 chrono = { version = "0.4" }
 url = { version = "2.3" }
 log = { version = "0.4" }
+simple_logger = { version = "4.2" }
 
 # sql dependencies
 arrow = { version = "46.0.0", features = ["prettyprint"] }
@@ -20,8 +21,8 @@ datafusion = { version = "31" }
 object_store = { version = "0.7", features=["aws"] }
 
 # tui
-crossterm = { version = "0.27.0" }
-ratatui = { version = "0.23.0" }
+crossterm = { version = "0.27" }
+ratatui = { version = "0.23" }
 
 # runtime
 tokio = { version = "1", features = ["full"] }
