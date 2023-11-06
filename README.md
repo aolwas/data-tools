@@ -1,4 +1,4 @@
-# data-tools
+# Aolwas Data tools
 
 Toy project around Rust/Arrow/Datafusion/DeltaRS/Axum/Tui
 
@@ -15,3 +15,4 @@ I clearly took inspiration from those projects:
 * <https://github.com/timvw/qv>
 * <https://github.com/roapi/roapi>
 * <https://github.com/datafusion-contrib/datafusion-tui>
+* <https://github.com/andygrove/bdt>
