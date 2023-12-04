@@ -1,14 +1,13 @@
+use anyhow::Result;
 use datafusion::arrow::datatypes::DataType;
-use datafusion::common::Result;
 use datafusion::datasource::file_format::parquet::ParquetFormat;
 use datafusion::datasource::listing::{
     ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl,
 };
 use datafusion::datasource::TableProvider;
-use datafusion::error::DataFusionError;
 use datafusion::execution::context::SessionConfig;
 use datafusion::prelude::*;
-use deltalake::{DeltaTable, DeltaTableBuilder, DeltaTableError};
+use deltalake::{DeltaTable, DeltaTableBuilder};
 use log::{debug, info};
 use object_store::aws::AmazonS3Builder;
 use std::sync::Arc;
@@ -26,7 +25,7 @@ pub struct TableContext {
 impl TableContext {
     pub fn new(table_path: &str, partitions: &Option<String>, fmt: Format) -> Self {
         Self {
-            ctx: SessionContext::with_config(
+            ctx: SessionContext::new_with_config(
                 SessionConfig::default().with_information_schema(true),
             ),
             path: ensure_scheme(table_path).unwrap(),
@@ -35,7 +34,39 @@ impl TableContext {
         }
     }
 
-    fn register_store(&self) -> Result<()> {
+    pub async fn register_table(&self) -> Result<()> {
+        debug!("register table");
+        let provider: Arc<dyn TableProvider> = match self.fmt {
+            Format::Parquet => {
+                let parquet_table = self.parquet_table_provider().await?;
+                Arc::new(parquet_table)
+            }
+            Format::Delta => {
+                let delta_table = self.delta_table_provider().await?;
+                Arc::new(delta_table)
+            }
+        };
+        self.ctx.register_table("tbl", provider)?;
+        Ok(())
+    }
+
+    pub async fn schema(&self) -> Result<DataFrame> {
+        let schema_query = "show columns from tbl";
+        info!("schema query: {}", schema_query);
+        Ok(self.ctx.sql(schema_query).await?)
+    }
+
+    pub async fn exec_query(&self, query: String, limit: usize) -> Result<DataFrame> {
+        let full_query = if query.starts_with("SELECT") || query.starts_with("select") {
+            format!("{} LIMIT {}", query, limit)
+        } else {
+            query.clone()
+        };
+        info!("full query: {}", full_query);
+        Ok(self.ctx.sql(full_query.as_str()).await?)
+    }
+
+    async fn parquet_table_provider(&self) -> Result<ListingTable> {
         debug!("register store");
         let url = &(self.path);
         match self.path.scheme() {
@@ -58,44 +89,6 @@ impl TableContext {
             }
             _ => (),
         }
-        Ok(())
-    }
-
-    pub async fn register_table(
-        &self,
-    ) -> Result<Option<Arc<(dyn TableProvider)>>, DataFusionError> {
-        debug!("register table");
-        let provider: Arc<dyn TableProvider> = match self.fmt {
-            Format::Parquet => {
-                self.register_store()?;
-                let parquet_table = self.parquet_table_provider().await?;
-                Arc::new(parquet_table)
-            }
-            Format::Delta => {
-                let delta_table = self.delta_table_provider().await?;
-                Arc::new(delta_table)
-            }
-        };
-        self.ctx.register_table("tbl", provider)
-    }
-
-    pub async fn schema(&self) -> Result<DataFrame> {
-        let schema_query = "show columns from tbl";
-        info!("schema query: {}", schema_query);
-        self.ctx.sql(schema_query).await
-    }
-
-    pub async fn exec_query(&self, query: String, limit: usize) -> Result<DataFrame> {
-        let full_query = if query.starts_with("SELECT") || query.starts_with("select") {
-            format!("{} LIMIT {}", query, limit)
-        } else {
-            query.clone()
-        };
-        info!("full query: {}", full_query);
-        self.ctx.sql(full_query.as_str()).await
-    }
-
-    async fn parquet_table_provider(&self) -> Result<ListingTable> {
         debug!("get parquet table provider");
         let file_format = ParquetFormat::default()
             .with_enable_pruning(Some(true))
@@ -118,12 +111,12 @@ impl TableContext {
         Ok(table)
     }
 
-    async fn delta_table_provider(&self) -> Result<DeltaTable, DeltaTableError> {
+    async fn delta_table_provider(&self) -> Result<DeltaTable> {
         debug!("get delta table provider");
-        DeltaTableBuilder::from_uri(self.path.as_str())
+        Ok(DeltaTableBuilder::from_uri(self.path.as_str())
             .without_tombstones()
             .load()
-            .await
+            .await?)
     }
 }
 

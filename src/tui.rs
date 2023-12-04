@@ -95,7 +95,7 @@ fn run_tui<B: Backend>(
     }
 }
 
-fn ui<B: Backend>(f: &mut Frame<B>, tui: &mut Tui, text: &str) {
+fn ui(f: &mut Frame, tui: &Tui, text: &str) {
     let area = f.size();
 
     let paragraph = Paragraph::new(text)
