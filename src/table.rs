@@ -113,6 +113,7 @@ impl TableContext {
 
     async fn delta_table_provider(&self) -> Result<DeltaTable> {
         debug!("get delta table provider");
+        deltalake::aws::register_handlers(None);
         Ok(DeltaTableBuilder::from_uri(self.path.as_str())
             .without_tombstones()
             .load()
