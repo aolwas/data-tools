@@ -10,4 +10,7 @@
 **/*.rs.bk
 
 
-/localdata/
+/localdata/# pixi environments
+.pixi
+*.egg-info
+
