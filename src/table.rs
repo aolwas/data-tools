@@ -91,8 +91,8 @@ impl TableContext {
         }
         debug!("get parquet table provider");
         let file_format = ParquetFormat::default()
-            .with_enable_pruning(Some(true))
-            .with_skip_metadata(Some(true));
+            .with_enable_pruning(true)
+            .with_skip_metadata(true);
 
         let listing_common_options =
             ListingOptions::new(Arc::new(file_format)).with_file_extension(".parquet");

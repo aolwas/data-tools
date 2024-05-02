@@ -97,6 +97,7 @@ async fn main() {
                             .write_json(
                                 op,
                                 DataFrameWriteOptions::default().with_single_file_output(true),
+                                None
                             )
                             .await
                             .unwrap();

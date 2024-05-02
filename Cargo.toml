@@ -15,10 +15,9 @@ log = { version = "0.4" }
 simple_logger = { version = "4.2" }
 
 # sql dependencies
-arrow = { version = "50", features = ["prettyprint"] }
-deltalake = { version = "0.17", features = ["datafusion", "s3"]}
-#deltalake = { git = "https://github.com/delta-io/delta-rs.git", tag = "python-v0.15.1", features = ["datafusion","s3"]}
-datafusion = { version = "35" }
+arrow = { version = "51", features = ["prettyprint"] }
+deltalake = { version = "0.17.3", features = ["datafusion", "s3"]}
+datafusion = { version = "37.1" }
 object_store = { version = "0.9", features=["aws"] }
 
 # tui
