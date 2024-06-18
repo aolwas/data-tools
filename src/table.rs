@@ -34,6 +34,10 @@ impl TableContext {
         }
     }
 
+    pub fn context(&self) -> &SessionContext {
+        &self.ctx
+    }
+
     pub async fn register_table(&self) -> Result<()> {
         debug!("register table");
         let provider: Arc<dyn TableProvider> = match self.fmt {
@@ -56,13 +60,18 @@ impl TableContext {
         Ok(self.ctx.sql(schema_query).await?)
     }
 
-    pub async fn exec_query(&self, query: String, limit: usize) -> Result<DataFrame> {
+    pub fn build_query(&self, query: String, limit: usize) -> String {
         let full_query = if query.starts_with("SELECT") || query.starts_with("select") {
             format!("{} LIMIT {}", query, limit)
         } else {
             query.clone()
         };
         info!("full query: {}", full_query);
+        full_query
+    }
+
+    pub async fn exec_query(&self, query: String, limit: usize) -> Result<DataFrame> {
+        let full_query = self.build_query(query, limit);
         Ok(self.ctx.sql(full_query.as_str()).await?)
     }
 

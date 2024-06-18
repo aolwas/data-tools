@@ -53,6 +53,18 @@ pub enum Commands {
         #[arg(long, default_value_t = false)]
         no_tui: bool,
     },
+    /// Print logical plan
+    Explain {
+        table_path: String,
+        #[arg(short, long, value_enum, default_value_t = Format::Delta)]
+        format: Format,
+        #[arg(short, long, default_value_t = String::from("select * from tbl"))]
+        query: String,
+        #[arg(short, long, default_value_t = 50)]
+        limit: usize,
+        #[arg(short, long)]
+        partitions: Option<String>,
+    },
 }
 
 impl Cli {

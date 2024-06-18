@@ -97,7 +97,7 @@ async fn main() {
                             .write_json(
                                 op,
                                 DataFrameWriteOptions::default().with_single_file_output(true),
-                                None
+                                None,
                             )
                             .await
                             .unwrap();
@@ -148,6 +148,39 @@ async fn main() {
                         .as_str(),
                 );
             }
+        }
+        Commands::Explain {
+            table_path,
+            format,
+            query,
+            limit,
+            partitions,
+        } => {
+            // Create table context
+            let tblctx = Arc::new(TableContext::new(
+                table_path.as_str(),
+                partitions,
+                format.clone(),
+            ));
+            tblctx
+                .register_table()
+                .await
+                .expect("Table registration fails");
+            // parse the SQL
+            let full_query = tblctx.build_query(query.clone(), limit.clone());
+            let initial_plan = tblctx
+                .context()
+                .state()
+                .create_logical_plan(full_query.as_ref())
+                .await
+                .unwrap();
+            // show the plan
+            println!("Initial Plan:\n{:?}", initial_plan.clone());
+
+            let optimized_plan = tblctx.context().state().optimize(&initial_plan);
+
+            // show the plan
+            println!("Optimized Plan:\n{:?}", optimized_plan.unwrap());
         }
     }
 }
