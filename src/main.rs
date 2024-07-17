@@ -1,13 +1,17 @@
+use std::fs;
+use std::io::{BufRead, BufReader};
 use std::sync::Arc;
 use std::time::Instant;
 
 use arrow::util::pretty::pretty_format_batches;
 use clap::Parser;
+use context::SQLContext;
 use datafusion::dataframe::DataFrameWriteOptions;
 use log::{error, info};
 use simple_logger::SimpleLogger;
 
 mod cli;
+mod context;
 mod table;
 mod tui;
 mod utils;
@@ -181,6 +185,113 @@ async fn main() {
 
             // show the plan
             println!("Optimized Plan:\n{:?}", optimized_plan.unwrap());
+        }
+        // Commands::Execute { sql_file } => {
+        //     let cfg = RuntimeConfig::new();
+        //     let env = RuntimeEnv::new(cfg).unwrap();
+        //     let ses = SessionConfig::new().with_information_schema(true);
+        //     let mut state = SessionState::new_with_config_rt(ses, Arc::new(env));
+        //     state
+        //         .table_factories_mut()
+        //         .insert("DELTA".to_string(), Arc::new(DeltaTableFactory {}));
+        //     let ctx = SessionContext::new_with_state(state);
+        //     let mut query = "".to_owned();
+        //     let file = fs::File::open(sql_file);
+        //     let reader = BufReader::new(file.unwrap());
+        //     for line in reader.lines() {
+        //         match line {
+        //             Ok(line) if line.starts_with("--") => {
+        //                 continue;
+        //             }
+        //             Ok(line) => {
+        //                 let line = line.trim_end();
+        //                 query.push_str(line);
+        //                 if line.ends_with(';') {
+        //                     let df = ctx.sql(&query).await.expect("Query execution fails");
+        //                     let records = df
+        //                         .clone()
+        //                         .collect()
+        //                         .await
+        //                         .expect("Unable to collect dataframe records");
+        //                     println!(
+        //                         "{}",
+        //                         pretty_format_batches(&records).expect("Pretty format fails")
+        //                     );
+        //                     query = "".to_string();
+        //                 } else {
+        //                     query.push('\n');
+        //                 }
+        //             }
+        //             _ => {
+        //                 break;
+        //             }
+        //         }
+        //     }
+
+        //     // run the left over query if the last statement doesn't contain ‘;’
+        //     // ignore if it only consists of '\n'
+        //     if query.contains(|c| c != '\n') {
+        //         let df = ctx.sql(&query).await.expect("Query execution fails");
+        //         let records = df
+        //             .clone()
+        //             .collect()
+        //             .await
+        //             .expect("Unable to collect dataframe records");
+        //         println!(
+        //             "{}",
+        //             pretty_format_batches(&records).expect("Pretty format fails")
+        //         );
+        //     }
+        // }
+        Commands::Execute { sql_file } => {
+            let ctx = SQLContext::new();
+            let mut query = "".to_owned();
+            let file = fs::File::open(sql_file);
+            let reader = BufReader::new(file.unwrap());
+            for line in reader.lines() {
+                match line {
+                    Ok(line) if line.starts_with("--") => {
+                        continue;
+                    }
+                    Ok(line) => {
+                        let line = line.trim_end();
+                        query.push_str(line);
+                        if line.ends_with(';') {
+                            let df = ctx.sql(&query).await.expect("Query execution fails");
+                            let records = df
+                                .clone()
+                                .collect()
+                                .await
+                                .expect("Unable to collect dataframe records");
+                            println!(
+                                "{}",
+                                pretty_format_batches(&records).expect("Pretty format fails")
+                            );
+                            query = "".to_string();
+                        } else {
+                            query.push('\n');
+                        }
+                    }
+                    _ => {
+                        break;
+                    }
+                }
+            }
+
+            // run the left over query if the last statement doesn't contain ‘;’
+            // ignore if it only consists of '\n'
+            if query.contains(|c| c != '\n') {
+                let df = ctx.sql(&query).await.expect("Query execution fails");
+                let records = df
+                    .clone()
+                    .collect()
+                    .await
+                    .expect("Unable to collect dataframe records");
+                println!(
+                    "{}",
+                    pretty_format_batches(&records).expect("Pretty format fails")
+                );
+            }
         }
     }
 }

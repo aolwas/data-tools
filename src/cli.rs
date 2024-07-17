@@ -43,6 +43,8 @@ pub enum Commands {
         #[arg(short, long)]
         output_path: Option<String>,
     },
+    /// execute sql file
+    Execute { sql_file: String },
     /// print parquet or delta table schema
     Schema {
         table_path: String,

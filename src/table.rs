@@ -11,9 +11,10 @@ use deltalake::{DeltaTable, DeltaTableBuilder};
 use log::{debug, info};
 use object_store::aws::AmazonS3Builder;
 use std::sync::Arc;
-use url::{ParseError, Url};
+use url::Url;
 
 use crate::cli::Format;
+use crate::utils::ensure_scheme;
 
 pub struct TableContext {
     ctx: SessionContext,
@@ -143,20 +144,5 @@ fn get_partitions_spec(partitions: &Option<String>) -> Option<Vec<(String, DataT
         Some(vec)
     } else {
         None
-    }
-}
-
-fn ensure_scheme(s: &str) -> Result<Url, ()> {
-    match Url::parse(s) {
-        Ok(url) => Ok(url),
-        Err(ParseError::RelativeUrlWithoutBase) => {
-            let local_path = std::path::Path::new(s).canonicalize().unwrap();
-            if local_path.is_file() {
-                Url::from_file_path(&local_path)
-            } else {
-                Url::from_directory_path(&local_path)
-            }
-        }
-        Err(_) => Err(()),
     }
 }
