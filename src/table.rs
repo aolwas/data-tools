@@ -7,13 +7,13 @@ use datafusion::datasource::listing::{
 use datafusion::datasource::TableProvider;
 use datafusion::execution::context::SessionConfig;
 use datafusion::prelude::*;
-use deltalake::{DeltaTable, DeltaTableBuilder};
 use log::{debug, info};
 use object_store::aws::AmazonS3Builder;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use url::Url;
 
 use crate::cli::Format;
+use crate::deltalake::DeltaTable;
 use crate::utils::ensure_scheme;
 
 pub struct TableContext {
@@ -123,11 +123,12 @@ impl TableContext {
 
     async fn delta_table_provider(&self) -> Result<DeltaTable> {
         debug!("get delta table provider");
-        deltalake::aws::register_handlers(None);
-        Ok(DeltaTableBuilder::from_uri(self.path.as_str())
-            .without_tombstones()
-            .load()
-            .await?)
+        // deltalake::aws::register_handlers(None);
+        // Ok(DeltaTableBuilder::from_uri(self.path.as_str())
+        //     .without_tombstones()
+        //     .load()
+        //     .await?)
+        Ok(DeltaTable::from(format!("{}", self.path), HashMap::new())?)
     }
 }
 

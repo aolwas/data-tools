@@ -12,6 +12,7 @@ use simple_logger::SimpleLogger;
 
 mod cli;
 mod context;
+mod deltalake;
 mod table;
 mod tui;
 mod utils;

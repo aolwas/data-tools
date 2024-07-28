@@ -16,3 +16,4 @@ I clearly took inspiration from those projects:
 * <https://github.com/roapi/roapi>
 * <https://github.com/datafusion-contrib/datafusion-tui>
 * <https://github.com/andygrove/bdt>
+* <https://github.com/spiceai/spiceai> from whom I've borrowed the delta kernel based table provider.

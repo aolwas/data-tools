@@ -1,16 +1,17 @@
 use anyhow::Result;
+use datafusion::execution::context::{SessionContext, SessionState};
+use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
 use datafusion::logical_expr::{DdlStatement, LogicalPlan};
 use datafusion::prelude::*;
-use deltalake::datafusion::execution::context::{SessionContext, SessionState};
-use deltalake::datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
-use deltalake::datafusion::prelude::SessionConfig;
-use deltalake::delta_datafusion::DeltaTableFactory;
+// use deltalake::delta_datafusion::DeltaTableFactory;
 use object_store;
 use object_store::aws::AmazonS3Builder;
 use std::sync::Arc;
 use url::Url;
 
+use crate::deltalake::DeltaTableFactory;
 use crate::utils::ensure_scheme;
+
 pub struct SQLContext {
     ctx: SessionContext,
 }
@@ -48,10 +49,10 @@ impl SQLContext {
                     .runtime_env()
                     .object_store_registry
                     .register_store(&s3_url, Arc::new(s3));
-                match ft {
-                    "DELTA" => deltalake::aws::register_handlers(None),
-                    _ => (),
-                }
+                // match ft {
+                //     "DELTA" => deltalake::aws::register_handlers(None),
+                //     _ => (),
+                // }
             }
             _ => (),
         }
