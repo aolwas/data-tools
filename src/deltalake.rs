@@ -46,7 +46,7 @@ use delta_kernel::scan::ScanBuilder;
 use delta_kernel::snapshot::Snapshot;
 use delta_kernel::Table;
 use log::debug;
-use secrecy::{ExposeSecret, SecretString};
+// use secrecy::{ExposeSecret, SecretString};
 use snafu::prelude::*;
 use std::{collections::HashMap, sync::Arc};
 use url::Url;
@@ -205,10 +205,30 @@ fn map_delta_data_type_to_arrow_data_type(
             }
             DataType::Struct(fields.into())
         }
+        // delta_kernel::schema::DataType::Map(map_type) => {
+        //     let key_type = map_delta_data_type_to_arrow_data_type(map_type.key_type());
+        //     let value_type = map_delta_data_type_to_arrow_data_type(map_type.value_type());
+        //     DataType::Dictionary(Box::new(key_type), Box::new(value_type))
+        // }
         delta_kernel::schema::DataType::Map(map_type) => {
-            let key_type = map_delta_data_type_to_arrow_data_type(map_type.key_type());
-            let value_type = map_delta_data_type_to_arrow_data_type(map_type.value_type());
-            DataType::Dictionary(Box::new(key_type), Box::new(value_type))
+            let key_field = Arc::new(Field::new(
+                "key",
+                map_delta_data_type_to_arrow_data_type(map_type.key_type()),
+                false,
+            ));
+            let value_field = Arc::new(Field::new(
+                "value",
+                map_delta_data_type_to_arrow_data_type(map_type.value_type()),
+                true,
+            ));
+            DataType::Map(
+                Arc::new(Field::new_struct(
+                    "entries",
+                    [key_field, value_field],
+                    false,
+                )),
+                false,
+            )
         }
     }
 }
