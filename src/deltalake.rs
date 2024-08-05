@@ -17,7 +17,7 @@ Original version:
 https://github.com/spiceai/spiceai/blob/10221b20cca78eb7be9b649aea11dbc9e4f2d44b/crates/data_components/src/delta_lake.rs
 */
 
-use arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
+use arrow::datatypes::{DataType, Field, Schema, SchemaBuilder, SchemaRef, TimeUnit};
 use async_trait::async_trait;
 use datafusion::common::DFSchema;
 use datafusion::datasource::listing::PartitionedFile;
@@ -38,7 +38,7 @@ use datafusion::parquet::arrow::arrow_reader::RowSelection;
 use datafusion::parquet::file::metadata::RowGroupMetaData;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
 use datafusion::physical_plan::ExecutionPlan;
-use datafusion::sql::TableReference;
+use datafusion::scalar::ScalarValue;
 use delta_kernel::engine::default::executor::tokio::TokioBackgroundExecutor;
 use delta_kernel::engine::default::DefaultEngine;
 use delta_kernel::scan::state::{DvInfo, GlobalScanState, Stats};
@@ -93,6 +93,8 @@ pub struct DeltaTable {
     table: Table,
     engine: Arc<DefaultEngine<TokioBackgroundExecutor>>,
     arrow_schema: SchemaRef,
+    arrow_file_schema: SchemaRef,
+    arrow_partition_cols: Arc<Vec<Field>>,
     delta_schema: delta_kernel::schema::SchemaRef,
 }
 
@@ -104,16 +106,6 @@ impl DeltaTable {
     ) -> Result<Self> {
         let table =
             Table::try_from_uri(ensure_folder_location(table_location)).context(DeltaTableSnafu)?;
-
-        // let storage_options: HashMap<String, String> = storage_options
-        //     .into_iter()
-        //     .filter_map(|(k, v)| {
-        //         if k == "token" || k == "endpoint" {
-        //             return None;
-        //         }
-        //         Some((k, v.expose_secret().clone()))
-        //     })
-        //     .collect();
 
         let engine = Arc::new(
             DefaultEngine::try_new(
@@ -128,30 +120,74 @@ impl DeltaTable {
             .snapshot(engine.as_ref(), None)
             .context(DeltaTableSnafu)?;
 
-        let arrow_schema = Self::get_schema(&snapshot);
-        let delta_schema = snapshot.schema().clone();
+        let arrow_schema = Arc::new(Self::get_schema(&snapshot));
+        let arrow_file_schema = Arc::new(Self::get_file_schema(&snapshot));
+        let arrow_partition_cols = Arc::new(Self::get_partition_schema(&snapshot));
+        let delta_schema = Arc::new(snapshot.schema().clone());
 
         Ok(Self {
             table,
             engine,
-            arrow_schema: Arc::new(arrow_schema),
-            delta_schema: Arc::new(delta_schema),
+            arrow_schema: arrow_schema,
+            arrow_file_schema: arrow_file_schema,
+            arrow_partition_cols: arrow_partition_cols,
+            delta_schema: delta_schema,
         })
     }
 
     fn get_schema(snapshot: &Snapshot) -> Schema {
         let schema = snapshot.schema();
 
+        // add partition columns at the end of the schema
+        let fields: Vec<Field> = schema
+            .fields()
+            .map(|f| {
+                Field::new(
+                    f.name(),
+                    map_delta_data_type_to_arrow_data_type(&f.data_type),
+                    f.nullable,
+                )
+            })
+            .collect();
+
+        Schema::new(fields)
+    }
+
+    fn get_file_schema(snapshot: &Snapshot) -> Schema {
+        let schema = snapshot.schema();
+        let table_partition_cols = &snapshot.metadata().partition_columns;
+
+        // add partition columns at the end of the schema
+        let fields: Vec<Field> = schema
+            .fields()
+            .filter(|f| !table_partition_cols.contains(f.name()))
+            .map(|f| {
+                Field::new(
+                    f.name(),
+                    map_delta_data_type_to_arrow_data_type(&f.data_type),
+                    f.nullable,
+                )
+            })
+            .collect();
+
+        Schema::new(fields)
+    }
+
+    fn get_partition_schema(snapshot: &Snapshot) -> Vec<Field> {
+        let schema = snapshot.schema();
+        let table_partition_cols = &snapshot.metadata().partition_columns;
+
         let mut fields: Vec<Field> = vec![];
-        for field in schema.fields() {
+        for partition_col in table_partition_cols.iter() {
+            let dk_field = schema.field(partition_col).unwrap();
             fields.push(Field::new(
-                field.name(),
-                map_delta_data_type_to_arrow_data_type(&field.data_type),
-                field.nullable,
+                dk_field.name(),
+                map_delta_data_type_to_arrow_data_type(&dk_field.data_type),
+                dk_field.nullable,
             ));
         }
 
-        Schema::new(fields)
+        fields
     }
 }
 
@@ -205,11 +241,6 @@ fn map_delta_data_type_to_arrow_data_type(
             }
             DataType::Struct(fields.into())
         }
-        // delta_kernel::schema::DataType::Map(map_type) => {
-        //     let key_type = map_delta_data_type_to_arrow_data_type(map_type.key_type());
-        //     let value_type = map_delta_data_type_to_arrow_data_type(map_type.value_type());
-        //     DataType::Dictionary(Box::new(key_type), Box::new(value_type))
-        // }
         delta_kernel::schema::DataType::Map(map_type) => {
             let key_field = Arc::new(Field::new(
                 "key",
@@ -223,7 +254,7 @@ fn map_delta_data_type_to_arrow_data_type(
             ));
             DataType::Map(
                 Arc::new(Field::new_struct(
-                    "entries",
+                    "key_value",
                     [key_field, value_field],
                     false,
                 )),
@@ -267,7 +298,6 @@ impl TableProvider for DeltaTable {
             .map_err(map_delta_error_to_datafusion_err)?;
 
         let df_schema = DFSchema::try_from(Arc::clone(&self.arrow_schema))?;
-
         let filter = conjunction(filters.to_vec()).unwrap_or_else(|| lit(true));
         let physical_expr = state.create_physical_expr(filter, &df_schema)?;
 
@@ -337,11 +367,12 @@ impl TableProvider for DeltaTable {
         // which specifies which object store to read from.
         let file_scan_config = FileScanConfig::new(
             ObjectStoreUrl::local_filesystem(),
-            Arc::clone(&self.arrow_schema),
+            Arc::clone(&self.arrow_file_schema),
         )
         .with_limit(limit)
         .with_projection(projection.cloned())
-        .with_file_group(partitioned_files);
+        .with_file_group(partitioned_files)
+        .with_table_partition_cols((*self.arrow_partition_cols).clone());
         let exec = ParquetExec::builder(file_scan_config)
             .with_parquet_file_reader_factory(Arc::clone(&parquet_file_reader_factory))
             .with_predicate(Arc::clone(&physical_expr))
@@ -402,7 +433,7 @@ fn handle_scan_file(
     size: i64,
     _stats: Option<Stats>,
     dv_info: DvInfo,
-    _partition_values: HashMap<String, String>,
+    partition_values: HashMap<String, String>,
 ) {
     let root_url = match Url::parse(&scan_context.scan_state.table_root) {
         Ok(url) => url,
@@ -417,7 +448,24 @@ fn handle_scan_file(
     };
     let path = format!("{}/{path}", root_url.path());
 
-    let partitioned_file = PartitionedFile::new(path.clone(), size as u64);
+    let mut partitioned_file = PartitionedFile::new(path.clone(), size as u64);
+
+    let partition_values = scan_context
+        .scan_state
+        .partition_columns
+        .iter()
+        .map(|col| {
+            ScalarValue::try_from_string(
+                partition_values[col].clone(),
+                &map_delta_data_type_to_arrow_data_type(
+                    scan_context.scan_state.logical_schema.fields[col].data_type(),
+                ),
+            )
+            .unwrap()
+        })
+        .collect::<Vec<ScalarValue>>();
+
+    partitioned_file.partition_values = partition_values;
 
     // Get the selection vector (i.e. inverse deletion vector)
     let selection_vector =
