@@ -1,5 +1,16 @@
+use arrow::error::ArrowError;
 use datafusion::arrow::datatypes::{DataType, TimeUnit};
+use delta_kernel::Error as DKError;
+use thiserror::Error;
 use url::{ParseError, Url};
+
+#[derive(Debug, Error)]
+pub enum DeltaError {
+    #[error("An error occured with Delta Table")]
+    DeltaTableError(#[from] DKError),
+    #[error("An error occured with handling Arrow data")]
+    ArrowError(#[from] ArrowError),
+}
 
 pub fn type_from_str(type_str: &str) -> Result<DataType, String> {
     match type_str {

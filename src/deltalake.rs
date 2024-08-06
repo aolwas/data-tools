@@ -17,8 +17,9 @@ Original version:
 https://github.com/spiceai/spiceai/blob/10221b20cca78eb7be9b649aea11dbc9e4f2d44b/crates/data_components/src/delta_lake.rs
 */
 
-use arrow::datatypes::{DataType, Field, Schema, SchemaBuilder, SchemaRef, TimeUnit};
+use arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
 use async_trait::async_trait;
+use datafusion::catalog::{Session, TableProviderFactory};
 use datafusion::common::DFSchema;
 use datafusion::datasource::listing::PartitionedFile;
 use datafusion::datasource::physical_plan::parquet::{
@@ -27,9 +28,7 @@ use datafusion::datasource::physical_plan::parquet::{
 use datafusion::datasource::physical_plan::{
     FileScanConfig, ParquetExec, ParquetFileReaderFactory,
 };
-use datafusion::datasource::provider::TableProviderFactory;
 use datafusion::datasource::{TableProvider, TableType};
-use datafusion::execution::context::SessionState;
 use datafusion::execution::object_store::ObjectStoreUrl;
 use datafusion::logical_expr::utils::conjunction;
 use datafusion::logical_expr::CreateExternalTable;
@@ -46,38 +45,21 @@ use delta_kernel::scan::ScanBuilder;
 use delta_kernel::snapshot::Snapshot;
 use delta_kernel::Table;
 use log::debug;
-// use secrecy::{ExposeSecret, SecretString};
-use snafu::prelude::*;
 use std::{collections::HashMap, sync::Arc};
 use url::Url;
 
-#[derive(Debug, Snafu)]
-pub enum Error {
-    #[snafu(display("An error occured with Delta Table: {source}"))]
-    DeltaTableError { source: delta_kernel::Error },
+use crate::utils::DeltaError;
 
-    #[snafu(display("An error occured with handling Arrow data: {source}"))]
-    ArrowError { source: arrow::error::ArrowError },
-}
+type Result<T, E = DeltaError> = std::result::Result<T, E>;
 
-type Result<T, E = Error> = std::result::Result<T, E>;
-
-pub struct DeltaTableFactory {
-    // params: HashMap<String, SecretString>,
-}
-
-// impl DeltaTableFactory {
-//     #[must_use]
-//     pub fn new(params: HashMap<String, SecretString>) -> Self {
-//         Self { params }
-//     }
-// }
+#[derive(Debug, Default)]
+pub struct DeltaTableFactory {}
 
 #[async_trait]
 impl TableProviderFactory for DeltaTableFactory {
     async fn create(
         &self,
-        _ctx: &SessionState,
+        _ctx: &dyn Session,
         cmd: &CreateExternalTable,
     ) -> datafusion::error::Result<Arc<dyn TableProvider>> {
         let provider = if cmd.options.is_empty() {
@@ -89,6 +71,7 @@ impl TableProviderFactory for DeltaTableFactory {
     }
 }
 
+#[derive(Debug)]
 pub struct DeltaTable {
     table: Table,
     engine: Arc<DefaultEngine<TokioBackgroundExecutor>>,
@@ -104,21 +87,15 @@ impl DeltaTable {
         storage_options: HashMap<String, String>,
         // storage_options: HashMap<String, SecretString>,
     ) -> Result<Self> {
-        let table =
-            Table::try_from_uri(ensure_folder_location(table_location)).context(DeltaTableSnafu)?;
+        let table = Table::try_from_uri(ensure_folder_location(table_location.clone()))?;
 
-        let engine = Arc::new(
-            DefaultEngine::try_new(
-                table.location(),
-                storage_options,
-                Arc::new(TokioBackgroundExecutor::new()),
-            )
-            .context(DeltaTableSnafu)?,
-        );
+        let engine = Arc::new(DefaultEngine::try_new(
+            table.location(),
+            storage_options,
+            Arc::new(TokioBackgroundExecutor::new()),
+        )?);
 
-        let snapshot = table
-            .snapshot(engine.as_ref(), None)
-            .context(DeltaTableSnafu)?;
+        let snapshot = table.snapshot(engine.as_ref(), None)?;
 
         let arrow_schema = Arc::new(Self::get_schema(&snapshot));
         let arrow_file_schema = Arc::new(Self::get_file_schema(&snapshot));
@@ -287,7 +264,7 @@ impl TableProvider for DeltaTable {
 
     async fn scan(
         &self,
-        state: &SessionState,
+        state: &dyn Session,
         projection: Option<&Vec<usize>>,
         filters: &[Expr],
         limit: Option<usize>,
@@ -309,6 +286,7 @@ impl TableProvider for DeltaTable {
                     "Failed to get object store for table location".to_string(),
                 )
             })?;
+
         let parquet_file_reader_factory = Arc::new(DefaultParquetFileReaderFactory::new(store))
             as Arc<dyn ParquetFileReaderFactory>;
         let projected_delta_schema = project_delta_schema(

@@ -13,14 +13,17 @@ chrono = { version = "0.4" }
 url = { version = "2.3" }
 log = { version = "0.4" }
 simple_logger = { version = "4.2" }
-#secrecy = { version = "0.8.0" }
-snafu = { version = "0.8.4" }
+itertools = { version = "0.12" }
+thiserror = { version = "1.0" }
 
 # sql dependencies
-arrow = { version = "52", features = ["prettyprint"] }
-delta_kernel = { version = "0.2", features = ["default-engine", "cloud"]}
-datafusion = { version = "40" }
-object_store = { version = "0.10.1", features=["aws"] }
+arrow = { version = ">=53,<54", features = ["prettyprint"] }
+delta_kernel = { version = ">=0.4,<0.5", features = [
+    "default-engine",
+    "cloud",
+] }
+datafusion = { version = ">=43,<44" }
+object_store = { version = ">=0.11,<0.12", features = ["aws"] }
 
 # tui
 crossterm = { version = "0.27" }
