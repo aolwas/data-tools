@@ -18,11 +18,12 @@ thiserror = { version = "1.0" }
 
 # sql dependencies
 arrow = { version = ">=53,<54", features = ["prettyprint"] }
-delta_kernel = { version = ">=0.4,<0.5", features = [
+delta_kernel = { version = ">=0.6, <0.7", features = [
     "default-engine",
     "cloud",
 ] }
 datafusion = { version = ">=43,<44" }
+datafusion-functions-json = { version = ">=0.43,<0.44" }
 object_store = { version = ">=0.11,<0.12", features = ["aws"] }
 
 # tui
